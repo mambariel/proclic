@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Controle de Processos Licitatórios</title>
+
+<style>
+body { margin:0; font-family:Arial,sans-serif; background:#f4f6f8; color:#1f2937; }
+header { background:#0f172a; color:white; padding:20px; }
+main { max-width:1300px; margin:auto; padding:20px; }
+.card { background:white; padding:18px; border-radius:12px; margin-bottom:18px; box-shadow:0 2px 8px #0001; }
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+input, select, textarea { width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:5px; box-sizing:border-box; }
+textarea { min-height:70px; }
+button { border:0; border-radius:8px; padding:10px 14px; background:#2563eb; color:white; cursor:pointer; margin:3px; }
+button.secondary { background:#475569; }
+button.danger { background:#dc2626; }
+.kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+.kpi { background:#f8fafc; border-radius:12px; padding:15px; border-left:5px solid #2563eb; }
+.kpi strong { font-size:26px; display:block; }
+table { width:100%; border-collapse:collapse; }
+th, td { border-bottom:1px solid #e5e7eb; padding:10px; text-align:left; vertical-align:top; }
+th { background:#f1f5f9; }
+.badge { padding:4px 8px; border-radius:999px; font-size:12px; color:white; display:inline-block; }
+.verde { background:#16a34a; }
+.amarelo { background:#ca8a04; }
+.vermelho { background:#dc2626; }
+.cinza { background:#64748b; }
+.hidden { display:none; }
+.topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+.doc { background:#f8fafc; padding:12px; border-radius:10px; margin-top:10px; }
+@media (max-width:900px) {
+  .grid, .kpis { grid-template-columns:1fr; }
+  .topbar { flex-direction:column; align-items:flex-start; }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="topbar">
+    <div>
+      <h1>Controle Interno de Processos Licitatórios</h1>
+      <p>Acompanhamento da fase interna, gargalos e status report</p>
+    </div>
+
+    <div>
+      <label>Modo</label>
+      <select id="modo" onchange="alternarModo()">
+        <option value="exibicao">Exibição</option>
+        <option value="edicao">Edição</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section id="dashboard" class="card">
+  <h2>Dashboard Geral</h2>
+
+  <div class="kpis">
+    <div class="kpi"><span>Total de processos</span><strong id="kpiTotal">0</strong></div>
+    <div class="kpi"><span>Processos parados</span><strong id="kpiParados">0</strong></div>
+    <div class="kpi"><span>Valor estimado total</span><strong id="kpiValor">R$ 0</strong></div>
+    <div class="kpi"><span>Média de dias parados</span><strong id="kpiMedia">0</strong></div>
+    <div class="kpi"><span>Maior gargalo</span><strong id="kpiGargalo">—</strong></div>
+  </div>
+</section>
+
+<section id="ranking" class="card">
+  <h2>Ranking de Processos Parados</h2>
+  <p>Ordenado pelo maior tempo sem movimentação.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>SEI</th>
+        <th>Objeto</th>
+        <th>Fase atual</th>
+        <th>Status</th>
+        <th>Dias parado</th>
+        <th>Responsável pelo gargalo</th>
+      </tr>
+    </thead>
+    <tbody id="rankingBody"></tbody>
+  </table>
+</section>
+
+<section id="lista" class="card">
+  <h2>Projetos de Contratação</h2>
+
+  <button onclick="abrirNovoProcesso()">Novo processo</button>
+  <button class="secondary" onclick="exportarCSV()">Exportar CSV</button>
+  <button class="secondary" onclick="copiarStatusReport()">Copiar status report</button>
+
+  <br><br>
+
+  <table>
+    <thead>
+      <tr>
+        <th>SEI</th>
+        <th>Objeto</th>
+        <th>Rito</th>
+        <th>Destinação</th>
+        <th>Valor</th>
+        <th>Fase</th>
+        <th>Status</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="listaBody"></tbody>
+  </table>
+</section>
+
+<section id="formulario" class="card hidden">
+  <h2 id="tituloFormulario">Novo Processo</h2>
+
+  <input type="hidden" id="id">
+
+  <div class="grid">
+    <div>
+      <label>Nº Processo SEI</label>
+      <input id="sei">
+    </div>
+
+    <div>
+      <label>Objeto</label>
+      <input id="objeto">
+    </div>
+
+    <div>
+      <label>Setor demandante</label>
+      <input id="demandante">
+    </div>
+
+    <div>
+      <label>Elaborador responsável</label>
+      <input id="elaborador">
+    </div>
+
+    <div>
+      <label>Rito</label>
+      <select id="rito">
+        <option>Licitação</option>
+        <option>Inexigibilidade</option>
+        <option>Dispensa</option>
+        <option>Adesão à Ata de Registro de Preços</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Destinação</label>
+      <select id="destinacao">
+        <option>Comum</option>
+        <option>TIC</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Valor estimado</label>
+      <input id="valor" type="number" step="0.01">
+    </div>
+
+    <div>
+      <label>Fase atual</label>
+      <select id="fase">
+        <option>Planejamento da Contratação</option>
+        <option>Pesquisa de Mercado</option>
+        <option>Minuta Contratual</option>
+        <option>Parecer</option>
+        <option>Saneamento</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Status</label>
+      <select id="status">
+        <option>Em andamento</option>
+        <option>Aguardando demandante</option>
+        <option>Aguardando pesquisa de mercado</option>
+        <option>Aguardando parecer</option>
+        <option>Em saneamento</option>
+        <option>Parado</option>
+        <option>Concluído</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Data da última movimentação</label>
+      <input id="ultimaMovimentacao" type="date">
+    </div>
+
+    <div>
+      <label>Responsável pelo gargalo</label>
+      <select id="responsavelGargalo">
+        <option>Não se aplica</option>
+        <option>Setor demandante</option>
+        <option>Unidade técnica</option>
+        <option>Pesquisa de mercado</option>
+        <option>Jurídico/Parecer</option>
+        <option>Gestão superior</option>
+        <option>Fornecedor externo</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Prioridade</label>
+      <select id="prioridade">
+        <option>Baixa</option>
+        <option>Média</option>
+        <option>Alta</option>
+        <option>Crítica</option>
+      </select>
+    </div>
+  </div>
+
+  <h3>Planejamento da Contratação</h3>
+  <div class="doc">
+    <label><input type="checkbox" id="dod"> Documento de Oficialização da Demanda</label><br><br>
+    <label><input type="checkbox" id="etp"> Estudo Técnico Preliminar</label><br><br>
+    <label><input type="checkbox" id="mapaRiscos"> Mapa de Riscos</label><br><br>
+    <label><input type="checkbox" id="tr"> Termo de Referência</label>
+  </div>
+
+  <h3>Pesquisa de Mercado</h3>
+  <div class="doc">
+    <label><input type="checkbox" id="pesquisaRequisitos"> Requisitos legais verificados</label><br><br>
+    <label><input type="checkbox" id="pesquisaFontes"> Fontes registradas</label><br><br>
+    <label><input type="checkbox" id="pesquisaMemoria"> Memória de cálculo elaborada</label>
+  </div>
+
+  <h3>Minuta Contratual</h3>
+  <div class="doc">
+    <label><input type="checkbox" id="minutaTR"> Informações do TR conferidas</label><br><br>
+    <label><input type="checkbox" id="minutaPadrao"> Minuta padrão utilizada/adaptada</label><br><br>
+    <label><input type="checkbox" id="minutaClausulas"> Cláusulas essenciais verificadas</label>
+  </div>
+
+  <h3>Pendências / Observações</h3>
+  <textarea id="pendencias"></textarea>
+
+  <br><br>
+  <button onclick="salvarProcesso()">Salvar atualização</button>
+  <button class="secondary" onclick="abrirNovoProcesso()">Limpar / Novo</button>
+</section>
+
+</main>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwcrLGPaBQzZwkeuFdntvT263dTxL-2Tee7fjrYcpCiLdmtvbC3ctVNU_Mq-_Ib_do3/exec";
+
+let processos = [];
+
+async function carregarProcessos() {
+  try {
+    const resposta = await fetch(API_URL + "?t=" + Date.now());
+    const dados = await resposta.json();
+    processos = Array.isArray(dados) ? dados : [];
+    renderizar();
+  } catch (erro) {
+    alert("Erro ao carregar dados da planilha. Verifique se o Apps Script foi implantado como Web App e se a planilha tem a aba Processos.");
+    console.error(erro);
+    processos = [];
+    renderizar();
+  }
+}
+
+async function salvarNaPlanilha(processo) {
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "save",
+      ...processo
+    })
+  });
+}
+
+async function excluirNaPlanilha(id) {
+  await fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "delete",
+      id
+    })
+  });
+}
+
+
+function alternarModo() {
+  const modo = document.getElementById("modo").value;
+
+  dashboard.classList.toggle("hidden", modo !== "exibicao");
+  ranking.classList.toggle("hidden", modo !== "exibicao");
+  formulario.classList.toggle("hidden", modo !== "edicao");
+
+  renderizar();
+}
+
+function abrirNovoProcesso() {
+  document.getElementById("modo").value = "edicao";
+  alternarModo();
+
+  tituloFormulario.textContent = "Novo Processo";
+
+  document.querySelectorAll("#formulario input, #formulario select, #formulario textarea").forEach(campo => {
+    if (campo.type === "checkbox") campo.checked = false;
+    else campo.value = "";
+  });
+
+  rito.value = "Licitação";
+  destinacao.value = "Comum";
+  fase.value = "Planejamento da Contratação";
+  status.value = "Em andamento";
+  responsavelGargalo.value = "Não se aplica";
+  prioridade.value = "Média";
+}
+
+async function salvarProcesso() {
+  const idAtual = id.value;
+
+  const processo = {
+    id: idAtual || Date.now().toString(),
+    sei: sei.value,
+    objeto: objeto.value,
+    demandante: demandante.value,
+    elaborador: elaborador.value,
+    rito: rito.value,
+    destinacao: destinacao.value,
+    valor: Number(valor.value || 0),
+    fase: fase.value,
+    status: status.value,
+    ultimaMovimentacao: ultimaMovimentacao.value,
+    responsavelGargalo: responsavelGargalo.value,
+    prioridade: prioridade.value,
+    dod: dod.checked,
+    etp: etp.checked,
+    mapaRiscos: mapaRiscos.checked,
+    tr: tr.checked,
+    pesquisaRequisitos: pesquisaRequisitos.checked,
+    pesquisaFontes: pesquisaFontes.checked,
+    pesquisaMemoria: pesquisaMemoria.checked,
+    minutaTR: minutaTR.checked,
+    minutaPadrao: minutaPadrao.checked,
+    minutaClausulas: minutaClausulas.checked,
+    pendencias: pendencias.value
+  };
+
+  const index = processos.findIndex(p => String(p.id) === String(processo.id));
+  if (index >= 0) {
+    processos[index] = processo;
+  } else {
+    processos.push(processo);
+  }
+  renderizar();
+
+  try {
+    await salvarNaPlanilha(processo);
+    await carregarProcessos();
+    modo.value = "exibicao";
+    alternarModo();
+    alert("Processo salvo/atualizado com sucesso.");
+  } catch (erro) {
+    alert("Erro ao salvar na planilha.");
+    console.error(erro);
+  }
+}
+
+function editar(idBusca) {
+  const p = processos.find(p => p.id === idBusca);
+  if (!p) return;
+
+  Object.keys(p).forEach(chave => {
+    const campo = document.getElementById(chave);
+    if (!campo) return;
+
+    if (campo.type === "checkbox") campo.checked = p[chave];
+    else campo.value = p[chave];
+  });
+
+  tituloFormulario.textContent = "Atualizar Processo em Andamento";
+  modo.value = "edicao";
+  alternarModo();
+}
+async function excluir(idBusca) {
+  if (!confirm("Deseja excluir este processo?")) return;
+
+  await excluirNaPlanilha(idBusca);
+  await carregarProcessos();
+
+  alert("Processo excluído com sucesso.");
+}
+
+function diasParado(data) {
+  if (!data) return 0;
+
+  const hoje = new Date();
+  const ultima = new Date(data + "T00:00:00");
+
+  return Math.max(0, Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24)));
+}
+
+function nivelDias(dias) {
+  if (dias >= 30) return "vermelho";
+  if (dias >= 15) return "amarelo";
+  if (dias > 0) return "verde";
+  return "cinza";
+}
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
+function renderizar() {
+  renderizarLista();
+  renderizarDashboard();
+  renderizarRanking();
+}
+
+function renderizarLista() {
+  listaBody.innerHTML = "";
+
+  if (processos.length === 0) {
+    listaBody.innerHTML = `
+      <tr>
+        <td colspan="8">Nenhum processo cadastrado.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  processos.forEach(p => {
+    listaBody.innerHTML += `
+      <tr>
+        <td>${p.sei || "—"}</td>
+        <td>${p.objeto || "—"}</td>
+        <td>${p.rito || "—"}</td>
+        <td>${p.destinacao || "—"}</td>
+        <td>${formatarMoeda(p.valor)}</td>
+        <td>${p.fase || "—"}</td>
+        <td>${p.status || "—"}</td>
+        <td>
+          <button onclick="editar('${p.id}')">Atualizar andamento</button>
+          <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function renderizarDashboard() {
+  const total = processos.length;
+
+  const parados = processos.filter(p =>
+    p.status === "Parado" || diasParado(p.ultimaMovimentacao) >= 15
+  );
+
+  const valorTotal = processos.reduce((soma, p) => soma + Number(p.valor || 0), 0);
+
+  const media = parados.length
+    ? Math.round(parados.reduce((soma, p) => soma + diasParado(p.ultimaMovimentacao), 0) / parados.length)
+    : 0;
+
+  const gargalos = {};
+
+  parados.forEach(p => {
+    const responsavel = p.responsavelGargalo || "Não informado";
+    gargalos[responsavel] = (gargalos[responsavel] || 0) + 1;
+  });
+
+  const maiorGargalo = Object.keys(gargalos).sort((a,b) => gargalos[b] - gargalos[a])[0] || "—";
+
+  kpiTotal.textContent = total;
+  kpiParados.textContent = parados.length;
+  kpiValor.textContent = formatarMoeda(valorTotal);
+  kpiMedia.textContent = media;
+  kpiGargalo.textContent = maiorGargalo;
+}
+
+function renderizarRanking() {
+  rankingBody.innerHTML = "";
+
+  const rankingProcessos = [...processos]
+    .map(p => ({ ...p, dias: diasParado(p.ultimaMovimentacao) }))
+    .filter(p => p.dias > 0)
+    .sort((a,b) => b.dias - a.dias);
+
+  if (rankingProcessos.length === 0) {
+    rankingBody.innerHTML = `
+      <tr>
+        <td colspan="7">Nenhum processo com dias parados registrado.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  rankingProcessos.forEach((p, i) => {
+    rankingBody.innerHTML += `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${p.sei || "—"}</td>
+        <td>${p.objeto || "—"}</td>
+        <td>${p.fase || "—"}</td>
+        <td>${p.status || "—"}</td>
+        <td><span class="badge ${nivelDias(p.dias)}">${p.dias} dias</span></td>
+        <td>${p.responsavelGargalo || "—"}</td>
+      </tr>
+    `;
+  });
+}
+
+function exportarCSV() {
+  if (processos.length === 0) {
+    alert("Não há processos para exportar.");
+    return;
+  }
+
+  const cabecalho = [
+    "SEI",
+    "Objeto",
+    "Rito",
+    "Destinação",
+    "Valor estimado",
+    "Fase atual",
+    "Status",
+    "Última movimentação",
+    "Dias parado",
+    "Responsável pelo gargalo",
+    "Prioridade",
+    "Pendências"
+  ];
+
+  const linhas = processos.map(p => [
+    p.sei || "",
+    p.objeto || "",
+    p.rito || "",
+    p.destinacao || "",
+    p.valor || 0,
+    p.fase || "",
+    p.status || "",
+    p.ultimaMovimentacao || "",
+    diasParado(p.ultimaMovimentacao),
+    p.responsavelGargalo || "",
+    p.prioridade || "",
+    (p.pendencias || "").replace(/\n/g, " ")
+  ]);
+
+  const csv = [
+    cabecalho.join(";"),
+    ...linhas.map(linha =>
+      linha.map(campo => `"${String(campo).replace(/"/g, '""')}"`).join(";")
+    )
+  ].join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "status_report_processos_licitatorios.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function copiarStatusReport() {
+  if (processos.length === 0) {
+    alert("Não há processos para copiar.");
+    return;
+  }
+
+  const ordenados = [...processos]
+    .map(p => ({ ...p, dias: diasParado(p.ultimaMovimentacao) }))
+    .sort((a, b) => b.dias - a.dias);
+
+  const parados = processos.filter(p =>
+    p.status === "Parado" || diasParado(p.ultimaMovimentacao) >= 15
+  );
+
+  const valorTotal = processos.reduce(
+    (soma, p) => soma + Number(p.valor || 0),
+    0
+  );
+
+  let texto = "STATUS REPORT - PROCESSOS LICITATÓRIOS\n\n";
+
+  texto += `Total de processos: ${processos.length}\n`;
+  texto += `Processos parados: ${parados.length}\n`;
+  texto += `Valor estimado total: ${formatarMoeda(valorTotal)}\n\n`;
+
+  texto += "LISTA DE PROCESSOS\n\n";
+
+  ordenados.forEach((p, index) => {
+    texto += `${index + 1}. ${p.objeto || "Objeto não informado"}\n`;
+    texto += `   SEI: ${p.sei || "—"}\n`;
+    texto += `   Rito: ${p.rito || "—"} | Destinação: ${p.destinacao || "—"}\n`;
+    texto += `   Valor estimado: ${formatarMoeda(p.valor || 0)}\n`;
+    texto += `   Fase atual: ${p.fase || "—"}\n`;
+    texto += `   Status: ${p.status || "—"}\n`;
+    texto += `   Dias sem movimentação: ${p.dias}\n`;
+    texto += `   Responsável pelo gargalo: ${p.responsavelGargalo || "—"}\n`;
+    texto += `   Prioridade: ${p.prioridade || "—"}\n`;
+    texto += `   Pendências: ${p.pendencias || "—"}\n\n`;
+  });
+
+  navigator.clipboard.writeText(texto)
+    .then(() => alert("Status report copiado para a área de transferência."))
+    .catch(() => alert("Não foi possível copiar o status report."));
+}
+
+carregarProcessos();
+alternarModo();
+</script>
+</body>
+</html>
